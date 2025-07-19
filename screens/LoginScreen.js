@@ -1,24 +1,34 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { login } from '../services/authService';
+import { useNavigation } from '@react-navigation/native';
 
-const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+const LoginScreen = () => {
+  const navigation = useNavigation();
+
+  const [correo, setCorreo] = useState('');
+  const [contrasena, setContrasena] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Todos los campos son obligatorios');
+    if (!correo || !contrasena) {
+      Alert.alert('Campos incompletos', 'Por favor, completa todos los campos.');
       return;
     }
 
     setLoading(true);
     try {
-      await login(email, password);
-      navigation.replace('Home'); // Redirige al Home después del login
+      const response = await login({
+        correo: correo.trim(),
+        contrasena: contrasena.trim()
+      });
+
+      Alert.alert('Inicio de sesión exitoso');
+      navigation.replace('Home');
+
     } catch (error) {
-      Alert.alert('Error', 'Credenciales incorrectas o error de conexión');
+      console.error('Error al iniciar sesión:', error);
+      Alert.alert('Error de inicio de sesión', error?.response?.data?.error || 'Credenciales incorrectas');
     } finally {
       setLoading(false);
     }
@@ -26,35 +36,34 @@ const LoginScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Iniciar Sesión</Text>
-      
+      <Text style={styles.hospitalTitle}>HOSPITAL REGIONAL DE AYACUCHO</Text>
+      <Text style={styles.subtitle}>Miguel A. Mariscal Llerena</Text>
+
       <TextInput
         style={styles.input}
-        placeholder="Correo electrónico"
+        placeholder="Correo"
         keyboardType="email-address"
         autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
+        value={correo}
+        onChangeText={setCorreo}
       />
-      
+
       <TextInput
         style={styles.input}
         placeholder="Contraseña"
         secureTextEntry
-        value={password}
-        onChangeText={setPassword}
+        value={contrasena}
+        onChangeText={setContrasena}
       />
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" />
-      ) : (
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Ingresar</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
+        <Text style={styles.buttonText}>
+          {loading ? 'Ingresando...' : 'Ingresar'}
+        </Text>
+      </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-        <Text style={styles.link}>¿No tienes cuenta? Regístrate aquí</Text>
+      <TouchableOpacity onPress={() => navigation.navigate('Registro')}>
+        <Text style={styles.registerLink}>¿No tienes cuenta? Regístrate aquí</Text>
       </TouchableOpacity>
     </View>
   );
@@ -65,38 +74,45 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 20,
-    backgroundColor: '#fff'
+    backgroundColor: '#fff',
   },
-  title: {
-    fontSize: 24,
+  hospitalTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center'
+    color: '#670155',
+    textAlign: 'center',
+    marginBottom: 5,
+    marginTop: 20,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#a70589ff',
+    textAlign: 'center',
+    marginBottom: 30,
   },
   input: {
-    height: 50,
     borderWidth: 1,
     borderColor: '#ccc',
+    padding: 12,
     borderRadius: 8,
-    padding: 15,
-    marginBottom: 15
+    marginBottom: 12,
   },
   button: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#b31696ff',
     padding: 15,
     borderRadius: 8,
-    alignItems: 'center'
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16
-  },
-  link: {
-    color: '#007AFF',
     textAlign: 'center',
-    marginTop: 20
-  }
+    fontWeight: 'bold',
+  },
+  registerLink: {
+    marginTop: 20,
+    textAlign: 'center',
+    color: '#007AFF',
+  },
 });
 
 export default LoginScreen;

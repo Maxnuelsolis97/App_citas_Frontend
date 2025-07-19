@@ -1,196 +1,150 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import api from '../services/api';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { solicitarPostergacion, obtenerCitaActiva } from '../services/citaService';
 
-const PostergarCitaScreen = ({ route, navigation }) => {
-  const { citaId } = route.params;
+const PostergarCitaScreen = ({ navigation }) => {
+  const [motivo, setMotivo] = useState('');
   const [cita, setCita] = useState(null);
-  const [newDate, setNewDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [enviando, setEnviando] = useState(false);
 
-  // Cargar datos de la cita
   useEffect(() => {
     const fetchCita = async () => {
       try {
-        const response = await api.get(`/citas/${citaId}`);
+        const response = await obtenerCitaActiva();
         setCita(response.data);
-        setNewDate(parseISO(response.data.fecha));
       } catch (error) {
-        Alert.alert('Error', 'No se pudo cargar la cita');
-        navigation.goBack();
+        Alert.alert('Error', 'No se pudo cargar la cita activa');
+      } finally {
+        setLoading(false);
       }
     };
+
     fetchCita();
-  }, [citaId]);
+  }, []);
 
-  const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setNewDate(selectedDate);
-    }
-  };
-
-  const handlePostergar = async () => {
-    if (newDate <= new Date()) {
-      Alert.alert('Error', 'La nueva fecha debe ser futura');
-      return;
+  const handleSubmit = async () => {
+    if (!motivo || motivo.trim().length === 0) {
+      return Alert.alert('Error', 'El motivo no puede estar vacío');
     }
 
-    setLoading(true);
+    if (motivo.length > 200) {
+      return Alert.alert('Error', 'El motivo no puede exceder los 200 caracteres');
+    }
+
+    setEnviando(true);
+
     try {
-      await api.patch(`/citas/${citaId}`, {
-        fecha: newDate.toISOString(),
-        estado: 'reprogramada' // Ajusta según tu modelo
-      });
-      Alert.alert('Éxito', 'Cita reprogramada correctamente', [
-        { text: 'OK', onPress: () => navigation.replace('VerCita') }
+      await solicitarPostergacion({ motivo });
+      Alert.alert('Éxito', 'Solicitud de postergación enviada', [
+        {
+          text: 'OK',
+          onPress: () => navigation.navigate('Home'),
+        },
       ]);
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Error al reprogramar');
+      Alert.alert(
+        'Error',
+        error.response?.data?.message || 'No se pudo enviar la solicitud'
+      );
     } finally {
-      setLoading(false);
+      setEnviando(false);
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   if (!cita) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Cargando información de la cita...</Text>
+      <View style={styles.container}>
+        <Text style={styles.sinCita}>No tienes una cita activa para postergar.</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Reprogramar Cita</Text>
+    <View style={styles.container}>
+      <Text style={styles.titulo}>Motivo de postergación</Text>
 
-      <View style={styles.card}>
-        <View style={styles.infoRow}>
-          <Icon name="medical-services" size={20} color="#007AFF" />
-          <Text style={styles.infoText}>{cita.especialidad.nombre}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Icon name="calendar-today" size={20} color="#007AFF" />
-          <Text style={styles.infoText}>
-            Fecha actual: {format(parseISO(cita.fecha), "PPPp", { locale: es })}
-          </Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Icon name="notes" size={20} color="#007AFF" />
-          <Text style={styles.infoText}>Motivo: {cita.motivo}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.subtitle}>Selecciona nueva fecha y hora:</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Escribe el motivo (máx. 200 caracteres)"
+        multiline
+        maxLength={200}
+        value={motivo}
+        onChangeText={setMotivo}
+      />
 
       <TouchableOpacity
-        style={styles.dateButton}
-        onPress={() => setShowDatePicker(true)}
+        style={styles.boton}
+        onPress={handleSubmit}
+        disabled={enviando}
       >
-        <Icon name="edit-calendar" size={24} color="#555" />
-        <Text style={styles.dateText}>
-          {format(newDate, "PPPp", { locale: es })}
+        <Text style={styles.textoBoton}>
+          {enviando ? 'Enviando...' : 'Enviar solicitud'}
         </Text>
       </TouchableOpacity>
-
-      {showDatePicker && (
-        <DateTimePicker
-          value={newDate}
-          mode="datetime"
-          minimumDate={new Date()}
-          onChange={handleDateChange}
-        />
-      )}
-
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handlePostergar}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? 'Procesando...' : 'Confirmar Reprogramación'}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
     padding: 20,
-    backgroundColor: '#f5f5f5'
+    backgroundColor: '#fff',
+  },
+  titulo: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  input: {
+    height: 150,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 15,
+    borderRadius: 10,
+    textAlignVertical: 'top',
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  boton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  textoBoton: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
-    textAlign: 'center'
-  },
-  subtitle: {
+  sinCita: {
     fontSize: 16,
-    fontWeight: '600',
-    marginVertical: 15,
-    color: '#555'
+    color: '#555',
+    textAlign: 'center',
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    elevation: 3
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10
-  },
-  infoText: {
-    marginLeft: 10,
-    fontSize: 15,
-    color: '#555'
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 20
-  },
-  dateText: {
-    marginLeft: 10,
-    fontSize: 15
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  buttonDisabled: {
-    opacity: 0.6
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16
-  }
 });
 
 export default PostergarCitaScreen;

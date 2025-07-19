@@ -1,23 +1,24 @@
 import api from './api';
 
-export const getCitas = async () => {
-  const response = await api.get('/citas');
-  return response.data; 
+const agendarCita = ({ fecha, hora, especialidad }) => {
+  return api.post('/citas', { fecha, hora, especialidad });
 };
 
-export const agendarCita = (citaData) => {
-  return api.post('/citas', citaData); 
+const obtenerCitaActiva = () => {
+  return api.get('/citas/proxima');
 };
 
-export const postergarCita = (id, nuevaFecha) => {
-  return api.patch(`/citas/${id}`, { fecha: nuevaFecha });
+const cancelarCitaActiva = () => {
+  return api.post('/citas/cancelar');
 };
 
-export const cancelarCita = (id) => {
-  // Intenta con DELETE primero, si falla usa PATCH
-  try {
-    return api.delete(`/citas/${id}`);
-  } catch (error) {
-    return api.patch(`/citas/${id}`, { estado: 'cancelada' });
-  }
+const solicitarPostergacion = ({ motivo }) => {
+  return api.post('/solicitudes/postergacion', { motivo });
+};
+
+export default {
+  agendarCita,
+  obtenerCitaActiva,
+  cancelarCitaActiva,
+  solicitarPostergacion
 };

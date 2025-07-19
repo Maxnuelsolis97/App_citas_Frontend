@@ -1,142 +1,167 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { agendarCita } from '../services/citaService';
+import { Picker } from '@react-native-picker/picker';
+import { obtenerEspecialidades } from '../services/especialidadService'; // ✅ Corrección aquí
+import citaService from '../services/citaService';
 
-const AgendarCitaScreen = ({ navigation }) => {
-  const [especialidad, setEspecialidad] = useState('');
-  const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [motivo, setMotivo] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) setDate(selectedDate);
+const AgendarCitaScreen = () => {
+  const [especialidades, setEspecialidades] = useState([]);
+  const [especialidadSeleccionada, setEspecialidadSeleccionada] = useState('');
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(null);
+  const [horaSeleccionada, setHoraSeleccionada] = useState(null);
+  const [mostrarPickerFecha, setMostrarPickerFecha] = useState(false);
+  const [mostrarPickerHora, setMostrarPickerHora] = useState(false);
+
+  useEffect(() => {
+    const cargarEspecialidades = async () => {
+      try {
+        const data = await obtenerEspecialidades();
+        setEspecialidades(data || []);
+      } catch (error) {
+        console.error('Error al cargar especialidades:', error);
+        Alert.alert('Error', 'No se pudieron cargar las especialidades');
+      }
+    };
+    cargarEspecialidades();
+  }, []);
+
+  const mostrarFechaPicker = () => setMostrarPickerFecha(true);
+  const mostrarHoraPicker = () => setMostrarPickerHora(true);
+
+  const onChangeFecha = (event, selectedDate) => {
+    setMostrarPickerFecha(Platform.OS === 'ios');
+    if (selectedDate) {
+      setFechaSeleccionada(selectedDate);
+    }
   };
 
-  const handleSubmit = async () => {
-    if (!especialidad || !motivo) {
+  const onChangeHora = (event, selectedTime) => {
+    setMostrarPickerHora(Platform.OS === 'ios');
+    if (selectedTime) {
+      setHoraSeleccionada(selectedTime);
+    }
+  };
+
+  const formatearHora = (date) => {
+    if (!date) return '';
+    const hora = date.getHours().toString().padStart(2, '0');
+    const minutos = date.getMinutes().toString().padStart(2, '0');
+    return `${hora}:${minutos}`;
+  };
+
+  const handleAgendarCita = async () => {
+    if (!especialidadSeleccionada || !fechaSeleccionada || !horaSeleccionada) {
       Alert.alert('Error', 'Todos los campos son obligatorios');
       return;
     }
 
-    setLoading(true);
     try {
-      await agendarCita({
-        especialidadId: especialidad,
-        fecha: date.toISOString(),
-        motivo
+      const fechaISO = fechaSeleccionada.toISOString().split('T')[0]; // yyyy-mm-dd
+      const horaFormateada = formatearHora(horaSeleccionada); // HH:mm
+
+      await citaService.agendarCita({
+      fecha: fechaISO,
+      hora: horaFormateada,
+      especialidad: especialidadSeleccionada,
       });
-      Alert.alert('Éxito', 'Cita agendada correctamente', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+
+
+      Alert.alert('Éxito', 'Cita agendada correctamente');
     } catch (error) {
+      console.error('Error al agendar cita:', error);
       Alert.alert('Error', 'No se pudo agendar la cita');
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Agendar Nueva Cita</Text>
+    <View style={styles.container}>
+      <Text style={styles.label}>Especialidad</Text>
+      <View style={styles.picker}>
+        <Picker
+          selectedValue={especialidadSeleccionada}
+          onValueChange={(itemValue) => setEspecialidadSeleccionada(itemValue)}
+        >
+          <Picker.Item label="Selecciona una especialidad" value="" />
+          {Array.isArray(especialidades) &&
+            especialidades.map((esp) => (
+              <Picker.Item key={esp.id} label={esp.nombre} value={esp.id} />
+            ))}
+        </Picker>
+      </View>
 
-      <Text style={styles.label}>Especialidad:</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Ej: Cardiología"
-        value={especialidad}
-        onChangeText={setEspecialidad}
-      />
-
-      <Text style={styles.label}>Fecha y Hora:</Text>
-      <TouchableOpacity 
-        style={styles.dateButton} 
-        onPress={() => setShowDatePicker(true)}
-      >
-        <Text>{date.toLocaleString()}</Text>
+      <TouchableOpacity style={styles.buttonDisabled} onPress={mostrarFechaPicker}>
+        <Text style={styles.buttonText}>
+          {fechaSeleccionada ? fechaSeleccionada.toDateString() : 'Seleccionar Fecha'}
+        </Text>
       </TouchableOpacity>
 
-      {showDatePicker && (
+      <TouchableOpacity style={styles.buttonDisabled} onPress={mostrarHoraPicker}>
+        <Text style={styles.buttonText}>
+          {horaSeleccionada ? formatearHora(horaSeleccionada) : 'Seleccionar Hora'}
+        </Text>
+      </TouchableOpacity>
+
+      {mostrarPickerFecha && (
         <DateTimePicker
-          value={date}
-          mode="datetime"
+          value={fechaSeleccionada || new Date()}
+          mode="date"
           display="default"
-          onChange={handleDateChange}
+          onChange={onChangeFecha}
         />
       )}
 
-      <Text style={styles.label}>Motivo:</Text>
-      <TextInput
-        style={[styles.input, styles.multilineInput]}
-        multiline
-        numberOfLines={4}
-        placeholder="Describa el motivo de la consulta"
-        value={motivo}
-        onChangeText={setMotivo}
-      />
+      {mostrarPickerHora && (
+        <DateTimePicker
+          value={horaSeleccionada || new Date()}
+          mode="time"
+          display="default"
+          onChange={onChangeHora}
+        />
+      )}
 
-      <TouchableOpacity 
-        style={[styles.button, loading && styles.disabledButton]} 
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? 'Agendando...' : 'Confirmar Cita'}
-        </Text>
+      <TouchableOpacity style={styles.button} onPress={handleAgendarCita}>
+        <Text style={styles.buttonText}>Agendar Cita</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
-    padding: 20
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center'
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#fff',
   },
   label: {
     fontSize: 16,
     marginBottom: 8,
-    fontWeight: '600'
   },
-  input: {
+  picker: {
     borderWidth: 1,
     borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 20
+    marginBottom: 16,
+    borderRadius: 5,
   },
-  multilineInput: {
-    height: 100,
-    textAlignVertical: 'top'
-  },
-  dateButton: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 20
+  buttonDisabled: {
+    backgroundColor: '#ddd',
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 5,
+    alignItems: 'center',
   },
   button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  disabledButton: {
-    opacity: 0.6
+    backgroundColor: '#007bff',
+    padding: 14,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
-    fontWeight: 'bold'
-  }
+    fontWeight: 'bold',
+  },
 });
 
 export default AgendarCitaScreen;

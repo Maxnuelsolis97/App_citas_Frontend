@@ -1,123 +1,68 @@
-import React from 'react';
-import { View, TextInput, Button, Text, StyleSheet, Alert, ScrollView } from 'react-native';
-import { Formik } from 'formik';
-import * as Yup from 'yup';
-import axios from 'axios';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { register } from '../services/authService';
+import { useNavigation } from '@react-navigation/native';
 
-export default function RegisterScreen({ navigation }) {
-  const registerSchema = Yup.object().shape({
-    dni: Yup.string().length(8, 'Debe tener 8 dígitos').required('Requerido'),
-    nombres: Yup.string().required('Requerido'),
-    apellidos: Yup.string().required('Requerido'),
-    celular: Yup.string().length(9, 'Debe tener 9 dígitos').required('Requerido'),
-    correo: Yup.string().email('Correo inválido').required('Requerido'),
-    contraseña: Yup.string().min(6, 'Mínimo 6 caracteres').required('Requerido'),
-  });
+const RegisterScreen = () => {
+  const navigation = useNavigation();
 
-  const handleRegister = async (values, { resetForm }) => {
+  const [dni, setDni] = useState('');
+  const [nombres, setNombres] = useState('');
+  const [apellidos, setApellidos] = useState('');
+  const [celular, setcelular] = useState('');
+  const [correo, setCorreo] = useState('');
+  const [contrasena, setContrasena] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRegister = async () => {
+    if (!dni || !nombres || !apellidos || !celular || !correo || !contrasena) {
+      Alert.alert('Campos incompletos', 'Por favor, completa todos los campos.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      const response = await axios.post('http://10.0.2.2:3000/usuarios', values);
-      
-      if (response.status === 201 || response.status === 200) {
-        Alert.alert('✅ Registro exitoso', 'Ahora puedes iniciar sesión');
-        resetForm();
-        navigation.navigate('Login');
-      } else {
-        Alert.alert('Error', 'No se pudo registrar el usuario');
-        console.log('Respuesta inesperada:', response);
-      }
+      await register({ dni, nombres, apellidos, celular, correo, contrasena });
+      Alert.alert('Registro exitoso', 'Tu cuenta ha sido creada.', [
+        { text: 'OK', onPress: () => navigation.replace('Login') }
+      ]);
     } catch (error) {
-      console.log(error?.response?.data || error.message);
-      Alert.alert('Error', 'No se pudo registrar el usuario');
+      console.log('Error al registrar (frontend):', error.response?.data || error.message);
+      Alert.alert('Error al registrar', error.response?.data?.message || 'Ocurrió un error');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Registro de Usuario</Text>
-      <Formik
-        initialValues={{
-          dni: '',
-          nombres: '',
-          apellidos: '',
-          celular: '',
-          correo: '',
-          contraseña: '',
-        }}
-        validationSchema={registerSchema}
-        onSubmit={handleRegister}
-      >
-        {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
-          <>
-            <TextInput
-              placeholder="DNI"
-              style={styles.input}
-              keyboardType="number-pad"
-              onChangeText={handleChange('dni')}
-              onBlur={handleBlur('dni')}
-              value={values.dni}
-            />
-            {touched.dni && errors.dni && <Text style={styles.error}>{errors.dni}</Text>}
+    <View style={styles.container}>
+      <Text style={styles.title}>Crear cuenta</Text>
 
-            <TextInput
-              placeholder="Nombres"
-              style={styles.input}
-              onChangeText={handleChange('nombres')}
-              onBlur={handleBlur('nombres')}
-              value={values.nombres}
-            />
-            {touched.nombres && errors.nombres && <Text style={styles.error}>{errors.nombres}</Text>}
+      <TextInput style={styles.input} placeholder="DNI" value={dni} onChangeText={setDni} />
+      <TextInput style={styles.input} placeholder="Nombres" value={nombres} onChangeText={setNombres} />
+      <TextInput style={styles.input} placeholder="Apellidos" value={apellidos} onChangeText={setApellidos} />
+      <TextInput style={styles.input} placeholder="Teléfono" value={celular} onChangeText={setcelular} keyboardType="phone-pad" />
+      <TextInput style={styles.input} placeholder="Correo" value={correo} onChangeText={setCorreo} keyboardType="email-address" />
+      <TextInput style={styles.input} placeholder="Contrasena" value={contrasena} onChangeText={setContrasena} secureTextEntry />
 
-            <TextInput
-              placeholder="Apellidos"
-              style={styles.input}
-              onChangeText={handleChange('apellidos')}
-              onBlur={handleBlur('apellidos')}
-              value={values.apellidos}
-            />
-            {touched.apellidos && errors.apellidos && <Text style={styles.error}>{errors.apellidos}</Text>}
+      <TouchableOpacity onPress={handleRegister} style={styles.button}>
+        <Text style={styles.buttonText}>{loading ? 'Registrando...' : 'Registrarse'}</Text>
+      </TouchableOpacity>
 
-            <TextInput
-              placeholder="Celular"
-              style={styles.input}
-              keyboardType="phone-pad"
-              onChangeText={handleChange('celular')}
-              onBlur={handleBlur('celular')}
-              value={values.celular}
-            />
-            {touched.celular && errors.celular && <Text style={styles.error}>{errors.celular}</Text>}
-
-            <TextInput
-              placeholder="Correo"
-              style={styles.input}
-              keyboardType="email-address"
-              onChangeText={handleChange('correo')}
-              onBlur={handleBlur('correo')}
-              value={values.correo}
-            />
-            {touched.correo && errors.correo && <Text style={styles.error}>{errors.correo}</Text>}
-
-            <TextInput
-              placeholder="Contraseña"
-              style={styles.input}
-              secureTextEntry
-              onChangeText={handleChange('contraseña')}
-              onBlur={handleBlur('contraseña')}
-              value={values.contraseña}
-            />
-            {touched.contraseña && errors.contraseña && <Text style={styles.error}>{errors.contraseña}</Text>}
-
-            <Button title="Registrar" onPress={handleSubmit} />
-          </>
-        )}
-      </Formik>
-    </ScrollView>
+      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+        <Text style={styles.loginLink}>¿Ya tienes cuenta? Inicia sesión</Text>
+      </TouchableOpacity>
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
-  title: { fontSize: 24, marginBottom: 20, textAlign: 'center' },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 10 },
-  error: { color: 'red', marginBottom: 5 },
+  container: { flex: 1, justifyContent: 'center', padding: 20 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  input: { borderWidth: 1, borderColor: '#ccc', padding: 12, borderRadius: 8, marginBottom: 12 },
+  button: { backgroundColor: '#34C759', padding: 15, borderRadius: 8, marginTop: 10 },
+  buttonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+  loginLink: { marginTop: 20, textAlign: 'center', color: '#007AFF' },
 });
+
+export default RegisterScreen;
